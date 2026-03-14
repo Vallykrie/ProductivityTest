@@ -3,7 +3,6 @@ import SwiftData
 
 enum SortOption: String, CaseIterable {
     case priority = "Priority Score"
-    case dueDate = "Due Date"
     case creation = "Recently Added"
 }
 
@@ -14,17 +13,17 @@ struct TaskListView: View {
     @State private var showingAddSheet = false
     @State private var sortOption: SortOption = .priority
     @State private var showCompleted = false
+    @State private var selectedDate: Date = Date()
     
     // In-memory sorting and filtering
     private var filteredAndSortedTasks: [AcademicTask] {
-        let filtered = tasks.filter { showCompleted ? true : !$0.isCompleted }
+        let dateFiltered = tasks.filter { Calendar.current.isDate($0.dueDate, inSameDayAs: selectedDate) }
+        let statusFiltered = dateFiltered.filter { showCompleted ? true : !$0.isCompleted }
         
-        return filtered.sorted { task1, task2 in
+        return statusFiltered.sorted { task1, task2 in
             switch sortOption {
             case .priority:
                 return task1.priorityScore > task2.priorityScore
-            case .dueDate:
-                return task1.dueDate < task2.dueDate
             case .creation:
                 return task1.creationDate > task2.creationDate
             }
@@ -42,31 +41,42 @@ struct TaskListView: View {
                 )
                 .ignoresSafeArea()
                 
-                if tasks.isEmpty {
-                    ContentUnavailableView(
-                        "No Tasks Yet",
-                        systemImage: "checklist.checked",
-                        description: Text("Add your first academic task to get started based on the ICE formula.")
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(filteredAndSortedTasks) { task in
-                                TaskRowView(task: task)
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            modelContext.delete(task)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                VStack(spacing: 0) {
+                    CalendarHeaderView(selectedDate: $selectedDate)
+                    
+                    if tasks.isEmpty {
+                        ContentUnavailableView(
+                            "No Tasks Yet",
+                            systemImage: "checklist.checked",
+                            description: Text("Add your first academic task to get started based on the ICE formula.")
+                        )
+                    } else if filteredAndSortedTasks.isEmpty {
+                        ContentUnavailableView(
+                            "No Tasks for this date",
+                            systemImage: "calendar.badge.clock",
+                            description: Text("You have a free day! Or select another day from the calendar.")
+                        )
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(filteredAndSortedTasks) { task in
+                                    TaskRowView(task: task)
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                modelContext.delete(task)
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
                                         }
-                                    }
+                                }
                             }
+                            .padding()
                         }
-                        .padding()
                     }
                 }
             }
             .navigationTitle("My Tasks")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
